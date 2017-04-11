@@ -43,8 +43,7 @@ func readConfig (path string) (m map[string]int)  {
 
 func msgDigest(c chan string, m map[string]int) { 
 	for {
-		msg := <-c
-		fmt.Println(m)		
+		msg := <-c	
 		msgStr := strings.Split(msg, ":")
 		if (len(msgStr) == 2) {
 			//formatting
@@ -55,18 +54,16 @@ func msgDigest(c chan string, m map[string]int) {
 				fmt.Println(msg)		
 				continue
 			}
-			_, ok := m[key]
-			fmt.Println(ok)
-			fmt.Println(m[key])
-			if (ok) {
+			
+			if _, ok := m[key]; ok {
 				m[key] = value
 			} else {
-				fmt.Println("recieved bad msg 1")	
-				fmt.Println(key)	
+				fmt.Println("recieved bad msg")	
+				fmt.Println(msg)	
 				continue	
 			}
 		} else {
-			fmt.Println("recieved bad msg 2")
+			fmt.Println("recieved bad msg")
 			fmt.Println(msg)		
 			continue
 		}
@@ -79,8 +76,7 @@ func main() {
 	
 	fmt.Println("Reading Config...")
 	fridgeStock := readConfig(configPath)
-	//fridgeStock["Krombacher"]=11
-	fmt.Println(len(fridgeStock))
+
 	fmt.Println("Preparing Server...")
 	/* Lets prepare a address at any address at port 	*/   
 	ServerAddr,err 	:= net.ResolveUDPAddr("udp", port)
