@@ -8,6 +8,7 @@ import (
 	"io"
 	"strings"
 	"strconv"
+	"sort"
 )
  
 /* A Simple function to verify error */
@@ -57,17 +58,28 @@ func msgDigest(c chan string, m map[string]int) {
 			
 			if _, ok := m[key]; ok {
 				m[key] = value
+				printStock(m)
 			} else {
 				fmt.Println("recieved bad msg")	
-				fmt.Println(msg)	
+				fmt.Println(msgStr)	
 				continue	
 			}
 		} else {
 			fmt.Println("recieved bad msg")
-			fmt.Println(msg)		
+			fmt.Println(msgStr)		
 			continue
 		}
 	}
+}
+
+func printStock(m map[string]int){
+	var keys []string
+	for k := range m {
+		v := strconv.Itoa(m[k])
+		keys = append(keys, k +" : "+ v)
+	}
+	sort.Strings(keys)
+	fmt.Println(keys)
 }
 
 func main() {
@@ -95,10 +107,10 @@ func main() {
 	buf := make([]byte, 1024)
 	
 	for {
-		n,addr,err := ServerConn.ReadFromUDP(buf)
-		fmt.Println("Received ",string(buf[0:n]), " from ",addr)
-		messages <- string(buf[0:n])
+		n,_,err := ServerConn.ReadFromUDP(buf)
 		CheckError(err)
+		messages <- string(buf[0:n])
+		
 	}
 }
 
