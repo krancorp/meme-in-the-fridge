@@ -37,15 +37,18 @@ func main() {
 	
 	defer Conn.Close()
 	for {	
-		switch(content){
-				case "Pfungstaedter":
-				default : 
-					if(stock > 0){
+		if(stock>0){
+			switch(content){
+					case "Pfungstaedter":
+						if(randomizer.Intn(100)>=98){
+							stock--
+						}
+					default : 	
 						if(randomizer.Intn(10)>=7){
 							stock--
 						}
 					}
-				}
+		}
 		msg := content+ ":"+strconv.Itoa(stock)
 		buf := []byte(msg)
 		_,err := Conn.Write(buf)
