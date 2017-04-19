@@ -6,15 +6,30 @@ import (
 	"net"
 	"time"
 	"strconv"
+	"math"
 	"math/rand"
 )
- 
-func CheckError(err error) {
-    if err  != nil {
-        fmt.Println("Error: " , err)
-    }
+func init() {
+	rand.Seed(time.Now().UTC().UnixNano())
 }
-
+func CheckError(err error) {
+	if err  != nil {
+	fmt.Println("Error: " , err)
+	}
+}
+//barely ever changes
+func GrowPfungstaedter(stock *int) {
+	n := rand.Intn(50)
+	switch {
+	case n < 2: *stock--
+	case n > 49: *stock++
+	}
+}
+//exponential decay
+func GrowGrohe(stock *int) {
+	oldStock := float64(*stock)
+	*stock = int(math.Pow(oldStock, 0.95))
+}
 func GetLocalIP() string {
     addrs, err := net.InterfaceAddrs()
     if err != nil {
@@ -30,7 +45,6 @@ func GetLocalIP() string {
     }
     return ""
 }
-
  //order of cl-arguments: 1. target ip address, 2. monitored item
 func main() {
 	ServerAddr,err := net.ResolveUDPAddr("udp",os.Args[1])
@@ -46,21 +60,19 @@ func main() {
 	if(len(os.Args)>2){
 		content = os.Args[2]
 	}
-	seed := rand.NewSource(time.Now().UnixNano())
-	randomizer := rand.New(seed)
-
-	stock := randomizer.Intn(42)
+	
+	stock := rand.Intn(42)
 	
 	defer Conn.Close()
 	for {	
 		if(stock>0){
 			switch(content){
 					case "Pfungstaedter":
-						if(randomizer.Intn(100)>=98){
-							stock--
-						}
+							GrowPfungstaedter(&stock)
+					case "Grohe" :
+							GrowGrohe(&stock)
 					default : 	
-						if(randomizer.Intn(10)>=7){
+						if(rand.Intn(10)>=7){
 							stock--
 						}
 					}
