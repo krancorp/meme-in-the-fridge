@@ -12,9 +12,9 @@ import (
 	"sort"
 	"time"
 )
-
+var lastEntries []string
 func init(){
-	os.Create("./stock_content")
+	
 }
 /* A Simple function to verify error */
 func CheckError(err error) {
@@ -22,9 +22,10 @@ func CheckError(err error) {
         fmt.Println("Error: " , err)
         os.Exit(0)
     }
+
 }
 
-func readConfig (path string) (m map[string]int)  {
+func readConfig (path string) (m map[string]int, tableHeader string)  {
 	//Open File
 	file, err := os.Open(path)
 	CheckError(err)
@@ -45,16 +46,13 @@ func readConfig (path string) (m map[string]int)  {
 	}
 	//do some work on the html
 	sort.Strings(s)
-	f, err := os.OpenFile("./stock_content", os.O_APPEND|os.O_WRONLY, 0600)
-	CheckError(err)	
-	defer f.Close()
-	f.WriteString("<tr> <th>Zeitstempel</th>")
+	tableHeader = "<tr> <th>Zeitstempel</th>"
 	for i := range s{
 		if(len(s[i])>0){
-			f.WriteString("<th>"+s[i]+"</th>")
+			tableHeader += "<th>"+s[i]+"</th>"
 		}	
 	}
-	f.WriteString("</tr>")
+	tableHeader += "</tr>"
 	return
 }
 
@@ -88,94 +86,10 @@ func msgDigest(c chan string, m map[string]int) {
 	}
 }
 
-func genHTMLBody(m map[string]int){
-	var keys []string
-	keys = append(keys, " %%<tr> <td>" + time.Now().Format("2006-01-02 15:04:05")+"</td>")
-	for k := range m {
-		v := strconv.Itoa(m[k])
-		keys = append(keys, k + " %% <td>"+ v +"</td>")
-	}
-	sort.Strings(keys)
-	for v := range keys {
-		splitStr := strings.Split(keys[v], "%%")
-		keys[v] = splitStr[1]
-	}
-	keys = append(keys, "</tr>")
-
-	f, err := os.OpenFile("./stock_content", os.O_APPEND|os.O_WRONLY, 0600)
-	CheckError(err)	
-	defer f.Close()
-	for v := range keys {
-		f.WriteString(keys[v])	
-	}
-	f.Sync()
-}
-func printStock(m map[string]int){
-	var keys []string
-	for k := range m {
-		v := strconv.Itoa(m[k])
-		keys = append(keys, k +" : "+ v)
-	}
-	sort.Strings(keys)
-	fmt.Println(keys)
-}
-func startTcpServer(){
-	//Web-interface in the making
-	fmt.Println("Starting tcp-Server")
-	ln, err := net.Listen("tcp", ":80")
-	
-	CheckError(err)
-	for {
-		conn, err := ln.Accept()
-		fmt.Println("Request Incoming")
-		CheckError(err)
-		go handleWebRequest(conn)
-	}
-}
-
-func handleWebRequest(conn net.Conn){
-	// Make a buffer to hold incoming data.
-	buf := make([]byte, 1024)
-	// Read the incoming connection into the buffer.
-	_, err := conn.Read(buf)
-	if err != nil {
-		fmt.Println("Error reading:", err.Error())
-	}
-	// Combine the HTML fragments
-	fh, _ := ioutil.ReadFile("./stock_head")
-	fb, _ := ioutil.ReadFile("./stock_content")
-	ff, _ := ioutil.ReadFile("./stock_foot")
-	f := append(fh,fb...)
-	f = append(f, ff...)
-	conn.Write(f)
-	// Close the connection when you're done with it.
-	conn.Close()
-}
-func GetLocalIP() string {
-    addrs, err := net.InterfaceAddrs()
-    if err != nil {
-        return ""
-    }
-    for _, address := range addrs {
-        // check the address type and if it is not a loopback the display it
-        if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-            if ipnet.IP.To4() != nil {
-                return ipnet.IP.String()
-            }
-        }
-    }
-    return ""
-}
-func main() {
-	go startTcpServer()
-	//Start and handle UDP server
-	port, configPath := ":8080","./config.json"
-	
-	fmt.Println("Reading Config...")
-	fridgeStock := readConfig(configPath)
-
-	fmt.Println("Preparing Server...")
-	/* Lets prepare a address at any address at port 	*/   
+func startUdpServer(fridgeStock map[string]int){
+	port := ":8080"
+	fmt.Println("Preparing UDP-Server...")
+	// Lets prepare an address at any address at port  
 	ServerAddr,err 	:= net.ResolveUDPAddr("udp", port)
 	CheckError(err)
 	
@@ -195,6 +109,99 @@ func main() {
 		CheckError(err)
 		messages <- string(buf[0:n])
 		
+	}
 }
+func genHTMLBody(m map[string]int){
+	var keys []string
+	keys = append(keys, " %%<tr> <td>" + time.Now().Format("2006-01-02 15:04:05")+"</td>")
+	for k := range m {
+		v := strconv.Itoa(m[k])
+		keys = append(keys, k + " %% <td>"+ v +"</td>")
+	}
+	sort.Strings(keys)
+	for v := range keys {
+		splitStr := strings.Split(keys[v], "%%")
+		keys[v] = splitStr[1]
+	}
+	keys = append(keys, "</tr>")
+	
+	if(len(lastEntries) >= 100){
+		fmt.Println("cleaning up...")
+		//throw away eldest entry
+		lastEntries = lastEntries[len(lastEntries)-79:]
+	}
+	lastEntries = append(lastEntries, keys...)	
+	return
+}
+func printStock(m map[string]int){
+	var keys []string
+	for k := range m {
+		v := strconv.Itoa(m[k])
+		keys = append(keys, k +" : "+ v)
+	}
+	sort.Strings(keys)
+	fmt.Println(keys)
+}
+
+func handleWebRequest(conn net.Conn, tableHeader string){
+	// Make a buffer to hold incoming data.
+	buf := make([]byte, 1024)
+	// Read the incoming connection into the buffer.
+	_, err := conn.Read(buf)
+	if err != nil {
+		fmt.Println("Error reading:", err.Error())
+	}
+	// Combine the HTML fragments
+	fh, _ := ioutil.ReadFile("./stock_head")
+	ff, _ := ioutil.ReadFile("./stock_foot")
+	bth := []byte(tableHeader)
+	f := append(fh, bth...)
+	for _, entry := range lastEntries{
+		btc := []byte(entry)
+		f = append(f, btc...)
+	}
+	f = append(f, ff...)
+
+	conn.Write(f)
+	// Close the connection when you're done with it.
+	conn.Close()
+}
+
+func startTcpServer(fridgeStock map[string]int, tableHeader string){
+	//Web-interface in the making
+	fmt.Println("Starting TCP-Server")
+	ln, err := net.Listen("tcp", ":80")
+	
+	CheckError(err)
+	for {
+		conn, err := ln.Accept()
+		fmt.Println("Request Incoming")
+		CheckError(err)
+		go handleWebRequest(conn, tableHeader)
+	}
+}
+
+func GetLocalIP() string {
+    addrs, err := net.InterfaceAddrs()
+    if err != nil {
+        return ""
+    }
+    for _, address := range addrs {
+        // check the address type and if it is not a loopback the display it
+        if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+            if ipnet.IP.To4() != nil {
+                return ipnet.IP.String()
+            }
+        }
+    }
+    return ""
+}
+func main() {
+	configPath := "./config.json"
+	fridgeStock, tableHeader := readConfig(configPath)
+	block := make(chan bool)
+	go startUdpServer(fridgeStock)
+	go startTcpServer(fridgeStock, tableHeader)
+	<- block
 }
 
