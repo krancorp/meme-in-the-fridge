@@ -119,18 +119,17 @@ func genHTMLBody(m map[string]int){
 		keys = append(keys, k + " %% <td>"+ v +"</td>")
 	}
 	sort.Strings(keys)
+	tableRow := ""
 	for v := range keys {
 		splitStr := strings.Split(keys[v], "%%")
-		keys[v] = splitStr[1]
+		tableRow += splitStr[1]
 	}
-	keys = append(keys, "</tr>")
-	
-	if(len(lastEntries) >= 100){
-		fmt.Println("cleaning up...")
+	tableRow += "</tr>"
+	if(len(lastEntries) >= 40){
 		//throw away eldest entry
-		lastEntries = lastEntries[len(lastEntries)-79:]
+		lastEntries = lastEntries[1:]
 	}
-	lastEntries = append(lastEntries, keys...)	
+	lastEntries = append(lastEntries, tableRow)	
 	return
 }
 func printStock(m map[string]int){
@@ -148,20 +147,47 @@ func handleWebRequest(conn net.Conn, tableHeader string){
 	buf := make([]byte, 1024)
 	// Read the incoming connection into the buffer.
 	_, err := conn.Read(buf)
-	if err != nil {
-		fmt.Println("Error reading:", err.Error())
+		if err != nil {
+			fmt.Println("Error reading:", err.Error())
+		}
+	request := string(buf)
+	//check if message is a complete http request, else start timeout
+	retry, timeout := 0, 5
+	for !strings.Contains(request,"\r\n\r\n"){
+		_, err := conn.Read(buf)
+		if err != nil {
+			fmt.Println("Error reading:", err.Error())
+		}
+		request = string(buf)
+		if(retry >= timeout){
+			conn.Write([]byte("HTTP/1.1 408 Request Time-out \r\nContent-Length: 53\r\nContent-Type: text/html\r\n\r\n<html><body><h1>408 Request Time-out</h1></body></html>"))
+			conn.Close()
+			return
+		}
+		time.Sleep(time.Second * 1)
+		retry++					
+	}
+	requestLines := strings.Split(request,"\r\n")
+	//check if the request is valid
+	if(!strings.Contains(strings.ToUpper(requestLines[0]),"GET /STOCK HTTP/1.1")){
+		conn.Write([]byte("HTTP/1.1 400 Bad Request \r\nContent-Length: 48\r\nContent-Type: text/html\r\n\r\n<html><body><h1>400 Bad Request</h1></body></html>"))
+		conn.Close()
+		return
 	}
 	// Combine the HTML fragments
 	fh, _ := ioutil.ReadFile("./stock_head")
 	ff, _ := ioutil.ReadFile("./stock_foot")
 	bth := []byte(tableHeader)
 	f := append(fh, bth...)
-	for _, entry := range lastEntries{
-		btc := []byte(entry)
+	for i := len(lastEntries)-1; i>=0; i--{
+		btc := []byte(lastEntries[i])
 		f = append(f, btc...)
 	}
 	f = append(f, ff...)
-
+	// build the http Header
+	header := "HTTP/1.1 200 OK \r\nContent-Length: "+strconv.Itoa(len(f))+"\r\nContent-Type: text/html\r\n\r\n"
+	bhh := []byte(header)
+	f = append(bhh, f...)
 	conn.Write(f)
 	// Close the connection when you're done with it.
 	conn.Close()
@@ -175,7 +201,6 @@ func startTcpServer(fridgeStock map[string]int, tableHeader string){
 	CheckError(err)
 	for {
 		conn, err := ln.Accept()
-		fmt.Println("Request Incoming")
 		CheckError(err)
 		go handleWebRequest(conn, tableHeader)
 	}

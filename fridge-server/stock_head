@@ -16,15 +16,9 @@
       vertical-align:middle;
       }
     </style>
-    <script type="text/javascript">
-      function moveWin()
-      {  
-        window.scroll(0,10000);
-        setTimeout('moveWin();',5000);
-      }
-    </script>
+    
     <title>SmartFridge!</title>
   </head>
-  <body onLoad="moveWin();">
+  <body>
     <table>
 	
