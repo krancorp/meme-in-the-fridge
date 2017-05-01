@@ -145,8 +145,9 @@ func printStock(m map[string]int){
 const http404 string = "HTTP/1.1 400 Bad Request \r\nContent-Length: 50\r\nContent-Type: text/html\r\n\r\n<html><body><h1>400 Bad Request</h1></body></html>"
 const http408 string = "HTTP/1.1 408 Request Time-out \r\nContent-Length: 55\r\nContent-Type: text/html\r\n\r\n<html><body><h1>408 Request Time-out</h1></body></html>"
 
+type htmlRenderer func() []byte
 
-func handleWebRequest(conn net.Conn, tableHeader string, method string, subUrl string){
+func handleWebRequest(conn net.Conn, tableHeader string, method string, subUrl string, rend htmlRenderer){
 	// Make a buffer to hold incoming data.
 	buf := make([]byte, 1024)
 	// Read the incoming connection into the buffer.
@@ -172,29 +173,17 @@ func handleWebRequest(conn net.Conn, tableHeader string, method string, subUrl s
 		retry++					
 	}
 	requestLines := strings.Split(request,"\r\n")
-	//check if the request is valid
 
+	//check if the request is valid
 	if(!strings.Contains(strings.ToUpper(requestLines[0]), method +" "+ subUrl +" HTTP/1.1")){
 		conn.Write([]byte(http404))
 		conn.Close()
 		return
 	}
-	// Combine the HTML fragments
-	fh, _ := ioutil.ReadFile("./stock_head")
-	ff, _ := ioutil.ReadFile("./stock_foot")
-	bth := []byte(tableHeader)
-	f := append(fh, bth...)
-	for i := len(lastEntries)-1; i>=0; i--{
-		btc := []byte(lastEntries[i])
-		f = append(f, btc...)
-	}
-	f = append(f, ff...)
-	// build the http Header
-	header := "HTTP/1.1 200 OK \r\nContent-Length: "+strconv.Itoa(len(f))+"\r\nContent-Type: text/html\r\n\r\n"
-	bhh := []byte(header)
-	f = append(bhh, f...)
-	conn.Write(f)
-	// Close the connection when you're done with it.
+
+	rendHtml := rend()
+	httpHeader := "HTTP/1.1 200 OK \r\nContent-Length: "+strconv.Itoa(len(rendHtml))+"\r\nContent-Type: text/html\r\n\r\n"
+	conn.Write(append([]byte(httpHeader), rendHtml ...))
 	conn.Close()
 }
 
@@ -208,7 +197,19 @@ func startHttpServer(fridgeStock map[string]int, tableHeader string){
 	for {
 		conn, err := ln.Accept()
 		CheckError(err)
-		go handleWebRequest(conn, tableHeader, "GET", "/STOCK")
+		go handleWebRequest(conn, tableHeader, "GET", "/STOCK", func () []byte {
+			// Combine the HTML fragments
+			fh, _ := ioutil.ReadFile("./stock_head")
+			ff, _ := ioutil.ReadFile("./stock_foot")
+			bth := []byte(tableHeader)
+			f := append(fh, bth...)
+			for i := len(lastEntries)-1; i>=0; i--{
+				btc := []byte(lastEntries[i])
+				f = append(f, btc...)
+			}
+			f = append(f, ff...)
+			return f
+		})
 	}
 }
 
