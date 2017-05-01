@@ -160,7 +160,7 @@ func handleWebRequest(conn net.Conn, tableHeader string){
 		}
 		request = string(buf)
 		if(retry >= timeout){
-			conn.Write([]byte("HTTP/1.1 408 Request Time-out \r\nContent-Length: 53\r\nContent-Type: text/html\r\n\r\n<html><body><h1>408 Request Time-out</h1></body></html>"))
+			conn.Write([]byte("HTTP/1.1 408 Request Time-out \r\nContent-Length: 55\r\nContent-Type: text/html\r\n\r\n<html><body><h1>408 Request Time-out</h1></body></html>"))
 			conn.Close()
 			return
 		}
@@ -170,7 +170,7 @@ func handleWebRequest(conn net.Conn, tableHeader string){
 	requestLines := strings.Split(request,"\r\n")
 	//check if the request is valid
 	if(!strings.Contains(strings.ToUpper(requestLines[0]),"GET /STOCK HTTP/1.1")){
-		conn.Write([]byte("HTTP/1.1 400 Bad Request \r\nContent-Length: 48\r\nContent-Type: text/html\r\n\r\n<html><body><h1>400 Bad Request</h1></body></html>"))
+		conn.Write([]byte("HTTP/1.1 400 Bad Request \r\nContent-Length: 50\r\nContent-Type: text/html\r\n\r\n<html><body><h1>400 Bad Request</h1></body></html>"))
 		conn.Close()
 		return
 	}
