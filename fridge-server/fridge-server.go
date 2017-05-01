@@ -146,7 +146,7 @@ const http404 string = "HTTP/1.1 400 Bad Request \r\nContent-Length: 50\r\nConte
 const http408 string = "HTTP/1.1 408 Request Time-out \r\nContent-Length: 55\r\nContent-Type: text/html\r\n\r\n<html><body><h1>408 Request Time-out</h1></body></html>"
 
 
-func handleWebRequest(conn net.Conn, tableHeader string){
+func handleWebRequest(conn net.Conn, tableHeader string, method string, subUrl string){
 	// Make a buffer to hold incoming data.
 	buf := make([]byte, 1024)
 	// Read the incoming connection into the buffer.
@@ -173,7 +173,8 @@ func handleWebRequest(conn net.Conn, tableHeader string){
 	}
 	requestLines := strings.Split(request,"\r\n")
 	//check if the request is valid
-	if(!strings.Contains(strings.ToUpper(requestLines[0]),"GET /STOCK HTTP/1.1")){
+
+	if(!strings.Contains(strings.ToUpper(requestLines[0]), method +" "+ subUrl +" HTTP/1.1")){
 		conn.Write([]byte(http404))
 		conn.Close()
 		return
@@ -197,16 +198,17 @@ func handleWebRequest(conn net.Conn, tableHeader string){
 	conn.Close()
 }
 
-func startTcpServer(fridgeStock map[string]int, tableHeader string){
+
+func startHttpServer(fridgeStock map[string]int, tableHeader string){
 	//Web-interface in the making
-	fmt.Println("Starting TCP-Server")
+	fmt.Println("Starting Http-Server")
 	ln, err := net.Listen("tcp", ":80")
 	
 	CheckError(err)
 	for {
 		conn, err := ln.Accept()
 		CheckError(err)
-		go handleWebRequest(conn, tableHeader)
+		go handleWebRequest(conn, tableHeader, "GET", "/STOCK")
 	}
 }
 
@@ -225,12 +227,13 @@ func GetLocalIP() string {
     }
     return ""
 }
+
 func main() {
 	configPath := "./config.json"
 	fridgeStock, tableHeader := readConfig(configPath)
 	block := make(chan bool)
 	go startUdpServer(fridgeStock)
-	go startTcpServer(fridgeStock, tableHeader)
+	go startHttpServer(fridgeStock, tableHeader)
 	<- block
 }
 
