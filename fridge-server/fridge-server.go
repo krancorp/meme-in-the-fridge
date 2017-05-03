@@ -6,27 +6,32 @@ import (
 	"net"
 	"os"
 	"io"
+	"io/ioutil"
 	"strings"
 	"strconv"
 	"sort"
+	"time"
 )
- 
+var lastEntries []string
+func init(){
+	
+}
 /* A Simple function to verify error */
 func CheckError(err error) {
     if err  != nil {
         fmt.Println("Error: " , err)
         os.Exit(0)
     }
+
 }
 
-func readConfig (path string) (m map[string]int)  {
+func readConfig (path string) (m map[string]int, tableHeader string)  {
 	//Open File
 	file, err := os.Open(path)
 	CheckError(err)
 	defer file.Close()
-
 	m = make(map[string]int)
-
+	s := make([]string, 4)
 	//Start Reading..
 	reader := bufio.NewReader(file)
 	for {
@@ -36,10 +41,19 @@ func readConfig (path string) (m map[string]int)  {
 		} 
 		CheckError(err)
 		key := strings.TrimSpace(line)
+		s = append(s, key)
 		m[key] = 0
 	}
+	//do some work on the html
+	sort.Strings(s)
+	tableHeader = "<tr> <th>Zeitstempel</th>"
+	for i := range s{
+		if(len(s[i])>0){
+			tableHeader += "<th>"+s[i]+"</th>"
+		}	
+	}
+	tableHeader += "</tr>"
 	return
-	
 }
 
 func msgDigest(c chan string, m map[string]int) { 
@@ -51,27 +65,73 @@ func msgDigest(c chan string, m map[string]int) {
 			key := msgStr[0]
 			value, err := strconv.Atoi(msgStr[1])
 			if (err != nil) {
-				fmt.Println("recieved bad msg 0")
+				fmt.Println("received bad msg")
 				fmt.Println(msg)		
 				continue
 			}
 			
 			if _, ok := m[key]; ok {
 				m[key] = value
-				printStock(m)
+				genHTMLBody(m)
 			} else {
-				fmt.Println("recieved bad msg")	
+				fmt.Println("received bad msg")	
 				fmt.Println(msgStr)	
 				continue	
 			}
 		} else {
-			fmt.Println("recieved bad msg")
+			fmt.Println("received bad msg")
 			fmt.Println(msgStr)		
 			continue
 		}
 	}
 }
 
+func startUdpServer(fridgeStock map[string]int){
+	port := ":8080"
+	fmt.Println("Preparing UDP-Server...")
+	// Lets prepare an address at any address at port  
+	ServerAddr,err 	:= net.ResolveUDPAddr("udp", port)
+	CheckError(err)
+	
+	fmt.Println("Listening on ", GetLocalIP(), port)
+	/* Now listen at selected port */
+	ServerConn, err := net.ListenUDP("udp", ServerAddr)
+	CheckError(err)
+	defer ServerConn.Close()
+	
+	messages := make(chan string)
+	go msgDigest(messages,fridgeStock)
+
+	buf := make([]byte, 1024)
+	
+	for {
+		n,_,err := ServerConn.ReadFromUDP(buf)
+		CheckError(err)
+		messages <- string(buf[0:n])
+		
+	}
+}
+func genHTMLBody(m map[string]int){
+	var keys []string
+	keys = append(keys, " %%<tr> <td>" + time.Now().Format("2006-01-02 15:04:05")+"</td>")
+	for k := range m {
+		v := strconv.Itoa(m[k])
+		keys = append(keys, k + " %% <td>"+ v +"</td>")
+	}
+	sort.Strings(keys)
+	tableRow := ""
+	for v := range keys {
+		splitStr := strings.Split(keys[v], "%%")
+		tableRow += splitStr[1]
+	}
+	tableRow += "</tr>"
+	if(len(lastEntries) >= 40){
+		//throw away eldest entry
+		lastEntries = lastEntries[1:]
+	}
+	lastEntries = append(lastEntries, tableRow)	
+	return
+}
 func printStock(m map[string]int){
 	var keys []string
 	for k := range m {
@@ -80,6 +140,77 @@ func printStock(m map[string]int){
 	}
 	sort.Strings(keys)
 	fmt.Println(keys)
+}
+
+const http404 string = "HTTP/1.1 400 Bad Request \r\nContent-Length: 50\r\nContent-Type: text/html\r\n\r\n<html><body><h1>400 Bad Request</h1></body></html>"
+const http408 string = "HTTP/1.1 408 Request Time-out \r\nContent-Length: 55\r\nContent-Type: text/html\r\n\r\n<html><body><h1>408 Request Time-out</h1></body></html>"
+
+type htmlRenderer func() []byte
+
+func handleWebRequest(conn net.Conn, tableHeader string, method string, subUrl string, rend htmlRenderer){
+	// Make a buffer to hold incoming data.
+	buf := make([]byte, 1024)
+	// Read the incoming connection into the buffer.
+	_, err := conn.Read(buf)
+	if err != nil {
+		fmt.Println("Error reading:", err.Error())
+	}
+	request := string(buf)
+	//check if message is a complete http request, else start timeout
+	retry, timeout := 0, 5
+	for !strings.Contains(request,"\r\n\r\n"){
+		_, err := conn.Read(buf)
+		if err != nil {
+			fmt.Println("Error reading:", err.Error())
+		}
+		request = string(buf)
+		if(retry >= timeout){
+			conn.Write([]byte(http408))
+			conn.Close()
+			return
+		}
+		time.Sleep(time.Second * 1)
+		retry++					
+	}
+	requestLines := strings.Split(request,"\r\n")
+
+	//check if the request is valid
+	if(!strings.Contains(strings.ToUpper(requestLines[0]), method +" "+ subUrl +" HTTP/1.1")){
+		conn.Write([]byte(http404))
+		conn.Close()
+		return
+	}
+
+	rendHtml := rend()
+	httpHeader := "HTTP/1.1 200 OK \r\nContent-Length: "+strconv.Itoa(len(rendHtml))+"\r\nContent-Type: text/html\r\n\r\n"
+	conn.Write(append([]byte(httpHeader), rendHtml ...))
+	conn.Close()
+}
+
+
+func startHttpServer(fridgeStock map[string]int, tableHeader string){
+	//Web-interface in the making
+	fmt.Println("Starting Http-Server")
+	ln, err := net.Listen("tcp", ":80")
+	
+	CheckError(err)
+	for {
+		conn, err := ln.Accept()
+		CheckError(err)
+		go handleWebRequest(conn, tableHeader, "GET", "/STOCK", func () []byte {
+			// Combine the HTML fragments
+			fh, _ := ioutil.ReadFile("./stock_head")
+			ff, _ := ioutil.ReadFile("./stock_foot")
+			bth := []byte(tableHeader)
+			f := append(fh, bth...)
+			for i := len(lastEntries)-1; i>=0; i--{
+				btc := []byte(lastEntries[i])
+				f = append(f, btc...)
+			}
+			f = append(f, ff...)
+			return f
+		})
+	}
 }
 
 func GetLocalIP() string {
@@ -99,33 +230,11 @@ func GetLocalIP() string {
 }
 
 func main() {
-
-	port, configPath := ":8080","./config.json"
-	
-	fmt.Println("Reading Config...")
-	fridgeStock := readConfig(configPath)
-
-	fmt.Println("Preparing Server...")
-	/* Lets prepare a address at any address at port 	*/   
-	ServerAddr,err 	:= net.ResolveUDPAddr("udp", port)
-	CheckError(err)
-	
-	
-	fmt.Println("Listening on port ", GetLocalIP(), port)
-	/* Now listen at selected port */
-	ServerConn, err := net.ListenUDP("udp", ServerAddr)
-	CheckError(err)
-	defer ServerConn.Close()
-	
-	messages := make(chan string)
-	go msgDigest(messages,fridgeStock)
-
-	buf := make([]byte, 1024)
-	
-	for {
-		n,_,err := ServerConn.ReadFromUDP(buf)
-		CheckError(err)
-		messages <- string(buf[0:n])
-		
-	}
+	configPath := "./config.json"
+	fridgeStock, tableHeader := readConfig(configPath)
+	block := make(chan bool)
+	go startUdpServer(fridgeStock)
+	go startHttpServer(fridgeStock, tableHeader)
+	<- block
 }
+

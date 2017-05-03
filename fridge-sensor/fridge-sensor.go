@@ -83,6 +83,6 @@ func main() {
 		if err != nil {
 			fmt.Println(msg, err)
 		}
-		time.Sleep(time.Second * 1)
+		time.Sleep(time.Second * 5)
 	}
 }
