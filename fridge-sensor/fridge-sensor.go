@@ -6,7 +6,6 @@ import (
 	"net"
 	"time"
 	"strconv"
-	"math"
 	"math/rand"
 )
 func init() {
@@ -17,19 +16,7 @@ func CheckError(err error) {
 	fmt.Println("Error: " , err)
 	}
 }
-//barely ever changes
-func GrowPfungstaedter(stock *int) {
-	n := rand.Intn(50)
-	switch {
-	case n < 2: *stock--
-	case n > 49: *stock++
-	}
-}
-//exponential decay
-func GrowGrohe(stock *int) {
-	oldStock := float64(*stock)
-	*stock = int(math.Pow(oldStock, 0.95))
-}
+
 func GetLocalIP() string {
     addrs, err := net.InterfaceAddrs()
     if err != nil {
@@ -68,9 +55,9 @@ func main() {
 		if(stock>0){
 			switch(content){
 					case "Pfungstaedter":
-							GrowPfungstaedter(&stock)
+							growPfungstaedter(&stock)
 					case "Grohe" :
-							GrowGrohe(&stock)
+							growGrohe(&stock)
 					default : 	
 						if(rand.Intn(10)>=7){
 							stock--
