@@ -75,7 +75,10 @@ func NewStoreHandler() *StoreHandler {
 }
 
 func (p* StoreHandler) GetPrice(product string) (price float64, err error){
-	fmt.Println("getPrice called")
+	fmt.Println("Got Request for Price of " + product)
+	if(product == "Pfungstaedter"){
+		fmt.Println("I'm sorry Dave, I'm afraid I can't do that, your taste in beverages is just too horrrible")	
+	}
 	if val, ok := m[product]; ok{
 		return val, nil
 	}
@@ -83,7 +86,7 @@ func (p* StoreHandler) GetPrice(product string) (price float64, err error){
 }
 
 func (p* StoreHandler) Order(product string, amount int32) (err error){
-	fmt.Println("order called")
+	fmt.Println(amount, " " + product + " was ordered")
 	if _, ok := m[product]; ok{
 		s:=ip+":" +strconv.Itoa(int(mp[product]))
 		fmt.Println(s)

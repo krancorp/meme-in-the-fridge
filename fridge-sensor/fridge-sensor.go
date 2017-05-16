@@ -72,7 +72,7 @@ func main() {
 		content = os.Args[2]
 	}
 	
-	stock = rand.Intn(42)
+	stock = 0
 	
 	defer Conn.Close()
 	for {	

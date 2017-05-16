@@ -2,13 +2,63 @@ package main
 
 import(
 	"fmt"
+	"os"
 	"strconv"
+	"math"
 	"time"
 	"strings"
 	"sort"
 	"net"
+	"meme-in-the-fridge/thrift-shop/gen-go/store"
+	"git.apache.org/thrift.git/lib/go/thrift"
 )
-
+var clients[]*store.StoreClient
+func ShoppingWrapper(m map[string]int){
+	sm := readStores("./stores")
+	for k, v := range sm{
+		fmt.Println(k,v)
+		addClient(k, v)
+	}
+	for {
+		shopping(m)
+	}
+		
+}
+func addClient(host, port string){
+	var protocolFactory thrift.TProtocolFactory
+	protocolFactory = thrift.NewTBinaryProtocolFactoryDefault()
+	trans, err := thrift.NewTSocket(net.JoinHostPort(host, port))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "error resolving address:", err)
+		os.Exit(1)
+	}
+	client := store.NewStoreClientFactory(trans, protocolFactory)
+	if err := trans.Open(); err != nil {
+		fmt.Fprintln(os.Stderr, "Error opening socket to ", host, ":", port, " ", err)
+		os.Exit(1)	
+	}
+	clients = append(clients, client)
+}
+func shopping(m map[string]int){
+	time.Sleep(time.Second*10)
+	for k, v := range m{
+		if(v < 6){
+			var cheapest *store.StoreClient
+			price := math.MaxFloat64
+			for _, store := range clients{
+				tmp, _ := store.GetPrice(k)
+				if(tmp < price){
+					price = tmp
+					cheapest = store
+				}
+			}			
+			if(price != math.MaxFloat64){
+				fmt.Println("Ordered "+k+" for " , price,  " $")
+				cheapest.Order(k, 10)
+			}	
+		}
+	}	
+}
 func msgDigest(c chan string, m map[string]int) { 
 	for {
 		msg := <-c	
@@ -25,6 +75,7 @@ func msgDigest(c chan string, m map[string]int) {
 			
 			if _, ok := m[key]; ok {
 				m[key] = value
+				
 				genHTMLBody(m)
 			} else {
 				fmt.Println("received bad msg")	

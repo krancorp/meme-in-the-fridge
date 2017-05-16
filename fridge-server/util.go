@@ -34,7 +34,24 @@ func GetLocalIP() string {
     }
     return ""
 }
-
+func readStores (path string) (m map[string]string) {
+	//Open File
+	file, err := os.Open(path)
+	CheckError(err)
+	defer file.Close()
+	m = make(map[string]string)
+	reader := bufio.NewReader(file)
+	for {
+		line, err := reader.ReadString(10) // 0x0A separator = newline
+		if err == io.EOF {
+			break
+		} 
+		CheckError(err)
+		tmp := strings.Split(line, " ")
+		m[tmp[0]] = strings.TrimSpace(tmp[1])
+	}
+	return m
+}
 func readConfig (path string) (m map[string]int, tableHeader string)  {
 	//Open File
 	file, err := os.Open(path)
