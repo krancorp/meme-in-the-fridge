@@ -21,7 +21,7 @@ func Usage() {
 	flag.PrintDefaults()
 	fmt.Fprintln(os.Stderr, "\nFunctions:")
 	fmt.Fprintln(os.Stderr, "  void order(string product, i32 amount)")
-	fmt.Fprintln(os.Stderr, "  i32 getPrice(string product)")
+	fmt.Fprintln(os.Stderr, "  double getPrice(string product)")
 	fmt.Fprintln(os.Stderr, "  SharedStruct getStruct(i32 key)")
 	fmt.Fprintln(os.Stderr)
 	os.Exit(0)

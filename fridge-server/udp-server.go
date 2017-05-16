@@ -68,7 +68,7 @@ func startUdpServer(fridgeStock map[string]int){
 	ServerAddr,err 	:= net.ResolveUDPAddr("udp", port)
 	CheckError(err)
 	
-	fmt.Println("Listening on ", GetLocalIP(), port)
+	fmt.Println("Listening on ", GetLocalIP()+":", port)
 	/* Now listen at selected port */
 	ServerConn, err := net.ListenUDP("udp", ServerAddr)
 	CheckError(err)

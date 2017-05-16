@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"math/rand"
 )
+var stock int
 func init() {
 	rand.Seed(time.Now().UTC().UnixNano())
 }
@@ -32,8 +33,31 @@ func GetLocalIP() string {
     }
     return ""
 }
- //order of cl-arguments: 1. target ip address, 2. monitored item
+func startUdpServer(port string){
+	fmt.Println("Preparing UDP-Server...")
+	// Lets prepare an address at any address at port  
+	ServerAddr,err 	:= net.ResolveUDPAddr("udp", port)
+	CheckError(err)
+	
+	fmt.Println("Listening on ", GetLocalIP(), port)
+	/* Now listen at selected port */
+	ServerConn, err := net.ListenUDP("udp", ServerAddr)
+	CheckError(err)
+	defer ServerConn.Close()
+	
+	buf := make([]byte, 1024)
+	
+	for {
+		n,_,err := ServerConn.ReadFromUDP(buf)
+		CheckError(err)
+		i, err := strconv.Atoi(string(buf[0:n]))
+		CheckError(err)
+		stock += i		
+	}
+}
+ //order of cl-arguments: 1. target ip address, 2. monitored item, 3. own upd server port
 func main() {
+	go startUdpServer(os.Args[3])
 	ServerAddr,err := net.ResolveUDPAddr("udp",os.Args[1])
 	CheckError(err)
 
@@ -48,7 +72,7 @@ func main() {
 		content = os.Args[2]
 	}
 	
-	stock := rand.Intn(42)
+	stock = rand.Intn(42)
 	
 	defer Conn.Close()
 	for {	

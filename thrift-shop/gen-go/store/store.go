@@ -26,7 +26,7 @@ type Store interface {
 	Order(product string, amount int32) (err error)
 	// Parameters:
 	//  - Product
-	GetPrice(product string) (r int32, err error)
+	GetPrice(product string) (r float64, err error)
 }
 
 type StoreClient struct {
@@ -103,7 +103,7 @@ func (p *StoreClient) recvOrder() (err error) {
 
 // Parameters:
 //  - Product
-func (p *StoreClient) GetPrice(product string) (r int32, err error) {
+func (p *StoreClient) GetPrice(product string) (r float64, err error) {
 	if err = p.sendGetPrice(product); err != nil {
 		return
 	}
@@ -126,7 +126,7 @@ func (p *StoreClient) sendGetPrice(product string) (err error) {
 	return
 }
 
-func (p *StoreClient) recvGetPrice() (value int32, err error) {
+func (p *StoreClient) recvGetPrice() (value float64, err error) {
 	iprot := p.InputProtocol
 	if iprot == nil {
 		iprot = p.ProtocolFactory.GetProtocol(p.Transport)
@@ -509,7 +509,7 @@ func (p *GetPriceArgs) String() string {
 }
 
 type GetPriceResult struct {
-	Success int32 `thrift:"success,0"`
+	Success float64 `thrift:"success,0"`
 }
 
 func NewGetPriceResult() *GetPriceResult {
@@ -549,7 +549,7 @@ func (p *GetPriceResult) Read(iprot thrift.TProtocol) error {
 }
 
 func (p *GetPriceResult) readField0(iprot thrift.TProtocol) error {
-	if v, err := iprot.ReadI32(); err != nil {
+	if v, err := iprot.ReadDouble(); err != nil {
 		return fmt.Errorf("error reading field 0: %s")
 	} else {
 		p.Success = v
@@ -577,10 +577,10 @@ func (p *GetPriceResult) Write(oprot thrift.TProtocol) error {
 }
 
 func (p *GetPriceResult) writeField0(oprot thrift.TProtocol) (err error) {
-	if err := oprot.WriteFieldBegin("success", thrift.I32, 0); err != nil {
+	if err := oprot.WriteFieldBegin("success", thrift.DOUBLE, 0); err != nil {
 		return fmt.Errorf("%T write field begin error 0:success: %s", p, err)
 	}
-	if err := oprot.WriteI32(int32(p.Success)); err != nil {
+	if err := oprot.WriteDouble(float64(p.Success)); err != nil {
 		return fmt.Errorf("%T.success (0) field write error: %s", p)
 	}
 	if err := oprot.WriteFieldEnd(); err != nil {

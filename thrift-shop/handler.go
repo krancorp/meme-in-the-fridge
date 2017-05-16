@@ -22,30 +22,109 @@ package main
 import (
 	"fmt"
 	"meme-in-the-fridge/thrift-shop/gen-go/shared"
+	"os"
+	"strconv"
+	"math"
+	"bufio"
+	"io"
+	"strings"
+	"errors"
+	"net"
 )
 
 type StoreHandler struct {
 	log map[int]*shared.SharedStruct
+}
+var m map[string]float64
+var mp map[string]int64
+var ip string
+func init(){
+	//Open File
+	file, err := os.Open("./config")
+	if(err!=nil){
+		fmt.Println(err)
+	}
+	defer file.Close()
+	m = make(map[string]float64)
+	mp = make(map[string]int64)
+	//Start Reading..
+	reader := bufio.NewReader(file)
+	for {
+		line, err := reader.ReadString(10) // 0x0A separator = newline
+		if err == io.EOF {
+			break
+		} 
+		tmp := strings.Split(line, " ")
+		if(tmp[0] == "SENSORIP"){
+			ip = strings.TrimSpace(tmp[1])	
+		} else {
+		m[tmp[0]], err = strconv.ParseFloat(tmp[1], 64)
+		if(err!=nil){
+				fmt.Println(err)
+			}
+		mp[tmp[0]], err = strconv.ParseInt(strings.TrimSpace(tmp[2]), 10, 64)
+		if(err!=nil){
+				fmt.Println(err)
+			}
+		}
+	}
 }
 
 func NewStoreHandler() *StoreHandler {
 	return &StoreHandler{log: make(map[int]*shared.SharedStruct)}
 }
 
-func (p* StoreHandler) GetPrice(product string) (price int32, err error){
+func (p* StoreHandler) GetPrice(product string) (price float64, err error){
 	fmt.Println("getPrice called")
-	return 1, nil
+	if val, ok := m[product]; ok{
+		return val, nil
+	}
+	return math.MaxFloat64, errors.New("not in stock")
 }
 
 func (p* StoreHandler) Order(product string, amount int32) (err error){
 	fmt.Println("order called")
-	return nil
+	if _, ok := m[product]; ok{
+		s:=ip+":" +strconv.Itoa(int(mp[product]))
+		fmt.Println(s)
+		ServerAddr, err := net.ResolveUDPAddr("udp", s)
+		if(err!=nil){
+			fmt.Println(err)
+		}
+		LocalAddr, err := net.ResolveUDPAddr("udp", GetLocalIP()+":0")
+		if(err!=nil){
+			fmt.Println(err)
+		}
+		Conn, err := net.DialUDP("udp", LocalAddr, ServerAddr)
+		if(err!=nil){
+			fmt.Println(err)
+		}
+		buf := []byte(strconv.Itoa(int(amount)))
+		Conn.Write(buf)
+		return  nil
+	}
+	return errors.New("not in stock")
 }
 
 func (p *StoreHandler) GetStruct(key int32) (*shared.SharedStruct, error) {
 	fmt.Print("getStruct(", key, ")\n")
 	v, _ := p.log[int(key)]
 	return v, nil
+}
+func GetLocalIP() string {
+    addrs, err := net.InterfaceAddrs()
+    if err != nil {
+        return ""
+    }
+    for _, address := range addrs {
+        // check the address type and if it is not a loopback the display it
+        if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+            if ipnet.IP.To4() != nil {
+                return ipnet.IP.String()
+            }
+        }
+    }
+    return ""
 }
 /*
 func (p *StoreHandler) Ping() (err error) {
