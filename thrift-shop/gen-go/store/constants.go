@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"git.apache.org/thrift.git/lib/go/thrift"
 	"math"
+	"meme-in-the-fridge/thrift-shop/gen-go/shared"
 )
 
 // (needed to ensure safety because of naive import list construction.)
@@ -14,4 +15,7 @@ var _ = math.MinInt32
 var _ = thrift.ZERO
 var _ = fmt.Printf
 
-var GoUnusedProtection__ int
+var _ = shared.GoUnusedProtection__
+
+func init() {
+}

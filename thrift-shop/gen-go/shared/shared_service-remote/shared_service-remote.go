@@ -11,7 +11,7 @@ import (
 	"net"
 	"net/url"
 	"os"
-	"store"
+	"shared"
 	"strconv"
 	"strings"
 )
@@ -20,8 +20,7 @@ func Usage() {
 	fmt.Fprintln(os.Stderr, "Usage of ", os.Args[0], " [-h host:port] [-u url] [-f[ramed]] function [arg1 [arg2...]]:")
 	flag.PrintDefaults()
 	fmt.Fprintln(os.Stderr, "\nFunctions:")
-	fmt.Fprintln(os.Stderr, "  void order(string product, i32 amount)")
-	fmt.Fprintln(os.Stderr, "  i32 getPrice(string product)")
+	fmt.Fprintln(os.Stderr, "  SharedStruct getStruct(i32 key)")
 	fmt.Fprintln(os.Stderr)
 	os.Exit(0)
 }
@@ -109,38 +108,26 @@ func main() {
 		Usage()
 		os.Exit(1)
 	}
-	client := store.NewStoreClientFactory(trans, protocolFactory)
+	client := shared.NewSharedServiceClientFactory(trans, protocolFactory)
 	if err := trans.Open(); err != nil {
 		fmt.Fprintln(os.Stderr, "Error opening socket to ", host, ":", port, " ", err)
 		os.Exit(1)
 	}
 
 	switch cmd {
-	case "order":
-		if flag.NArg()-1 != 2 {
-			fmt.Fprintln(os.Stderr, "Order requires 2 args")
+	case "getStruct":
+		if flag.NArg()-1 != 1 {
+			fmt.Fprintln(os.Stderr, "GetStruct requires 1 args")
 			flag.Usage()
 		}
-		argvalue0 := flag.Arg(1)
-		value0 := argvalue0
-		tmp1, err11 := (strconv.Atoi(flag.Arg(2)))
-		if err11 != nil {
+		tmp0, err6 := (strconv.Atoi(flag.Arg(1)))
+		if err6 != nil {
 			Usage()
 			return
 		}
-		argvalue1 := int32(tmp1)
-		value1 := argvalue1
-		fmt.Print(client.Order(value0, value1))
-		fmt.Print("\n")
-		break
-	case "getPrice":
-		if flag.NArg()-1 != 1 {
-			fmt.Fprintln(os.Stderr, "GetPrice requires 1 args")
-			flag.Usage()
-		}
-		argvalue0 := flag.Arg(1)
+		argvalue0 := int32(tmp0)
 		value0 := argvalue0
-		fmt.Print(client.GetPrice(value0))
+		fmt.Print(client.GetStruct(value0))
 		fmt.Print("\n")
 		break
 	case "":

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"git.apache.org/thrift.git/lib/go/thrift"
 	"math"
+	"meme-in-the-fridge/thrift-shop/gen-go/shared"
 )
 
 // (needed to ensure safety because of naive import list construction.)
@@ -14,7 +15,11 @@ var _ = math.MinInt32
 var _ = thrift.ZERO
 var _ = fmt.Printf
 
+var _ = shared.GoUnusedProtection__
+
 type Store interface {
+	shared.SharedService
+
 	// Parameters:
 	//  - Product
 	//  - Amount
@@ -25,29 +30,15 @@ type Store interface {
 }
 
 type StoreClient struct {
-	Transport       thrift.TTransport
-	ProtocolFactory thrift.TProtocolFactory
-	InputProtocol   thrift.TProtocol
-	OutputProtocol  thrift.TProtocol
-	SeqId           int32
+	*shared.SharedServiceClient
 }
 
 func NewStoreClientFactory(t thrift.TTransport, f thrift.TProtocolFactory) *StoreClient {
-	return &StoreClient{Transport: t,
-		ProtocolFactory: f,
-		InputProtocol:   f.GetProtocol(t),
-		OutputProtocol:  f.GetProtocol(t),
-		SeqId:           0,
-	}
+	return &StoreClient{SharedServiceClient: shared.NewSharedServiceClientFactory(t, f)}
 }
 
 func NewStoreClientProtocol(t thrift.TTransport, iprot thrift.TProtocol, oprot thrift.TProtocol) *StoreClient {
-	return &StoreClient{Transport: t,
-		ProtocolFactory: nil,
-		InputProtocol:   iprot,
-		OutputProtocol:  oprot,
-		SeqId:           0,
-	}
+	return &StoreClient{SharedServiceClient: shared.NewSharedServiceClientProtocol(t, iprot, oprot)}
 }
 
 // Parameters:
@@ -170,48 +161,14 @@ func (p *StoreClient) recvGetPrice() (value int32, err error) {
 }
 
 type StoreProcessor struct {
-	processorMap map[string]thrift.TProcessorFunction
-	handler      Store
-}
-
-func (p *StoreProcessor) AddToProcessorMap(key string, processor thrift.TProcessorFunction) {
-	p.processorMap[key] = processor
-}
-
-func (p *StoreProcessor) GetProcessorFunction(key string) (processor thrift.TProcessorFunction, ok bool) {
-	processor, ok = p.processorMap[key]
-	return processor, ok
-}
-
-func (p *StoreProcessor) ProcessorMap() map[string]thrift.TProcessorFunction {
-	return p.processorMap
+	*shared.SharedServiceProcessor
 }
 
 func NewStoreProcessor(handler Store) *StoreProcessor {
-
-	self8 := &StoreProcessor{handler: handler, processorMap: make(map[string]thrift.TProcessorFunction)}
-	self8.processorMap["order"] = &storeProcessorOrder{handler: handler}
-	self8.processorMap["getPrice"] = &storeProcessorGetPrice{handler: handler}
+	self8 := &StoreProcessor{shared.NewSharedServiceProcessor(handler)}
+	self8.AddToProcessorMap("order", &storeProcessorOrder{handler: handler})
+	self8.AddToProcessorMap("getPrice", &storeProcessorGetPrice{handler: handler})
 	return self8
-}
-
-func (p *StoreProcessor) Process(iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {
-	name, _, seqId, err := iprot.ReadMessageBegin()
-	if err != nil {
-		return false, err
-	}
-	if processor, ok := p.GetProcessorFunction(name); ok {
-		return processor.Process(seqId, iprot, oprot)
-	}
-	iprot.Skip(thrift.STRUCT)
-	iprot.ReadMessageEnd()
-	x9 := thrift.NewTApplicationException(thrift.UNKNOWN_METHOD, "Unknown function "+name)
-	oprot.WriteMessageBegin(name, thrift.EXCEPTION, seqId)
-	x9.Write(oprot)
-	oprot.WriteMessageEnd()
-	oprot.Flush()
-	return false, x9
-
 }
 
 type storeProcessorOrder struct {
