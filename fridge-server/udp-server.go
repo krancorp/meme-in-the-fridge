@@ -13,6 +13,7 @@ import(
 	"git.apache.org/thrift.git/lib/go/thrift"
 )
 var clients[]*store.StoreClient
+var bills[] string
 func ShoppingWrapper(m map[string]int){
 	sm := readStores("./stores")
 	for k, v := range sm{
@@ -39,23 +40,32 @@ func addClient(host, port string){
 	}
 	clients = append(clients, client)
 }
+func buy(k string){
+	var cheapest *store.StoreClient
+	price := math.MaxFloat64
+	for _, store := range clients{
+		tmp, _ := store.GetPrice(k)
+		if(tmp < price){
+			price = tmp
+			cheapest = store
+		}
+	}			
+	if(price != math.MaxFloat64){
+		//fmt.Println("Ordered "+k+" for " , 10.0*price,  " $")
+		tmp := "Ordered "+k+" for " + strconv.FormatFloat(10.0*price,'f',2,64) + "$"			
+		if(len(bills) >= 40){
+			//throw away eldest entry
+			bills = bills[1:]
+		}
+		bills = append(bills, tmp)
+		cheapest.Order(k, 10)
+	}
+}
 func shopping(m map[string]int){
 	time.Sleep(time.Second*10)
 	for k, v := range m{
 		if(v < 6){
-			var cheapest *store.StoreClient
-			price := math.MaxFloat64
-			for _, store := range clients{
-				tmp, _ := store.GetPrice(k)
-				if(tmp < price){
-					price = tmp
-					cheapest = store
-				}
-			}			
-			if(price != math.MaxFloat64){
-				fmt.Println("Ordered "+k+" for " , price,  " $")
-				cheapest.Order(k, 10)
-			}	
+			buy(k)	
 		}
 	}	
 }

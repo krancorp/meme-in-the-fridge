@@ -9,7 +9,7 @@ import(
 	"strings"
 	"sort"
 )
-
+var productNames []string
 /* A Simple function to verify error */
 func CheckError(err error) {
     if err  != nil {
@@ -76,6 +76,7 @@ func readConfig (path string) (m map[string]int, tableHeader string)  {
 	tableHeader = "<tr> <th>Zeitstempel</th>"
 	for i := range s{
 		if(len(s[i])>0){
+			productNames = append(productNames, s[i])
 			tableHeader += "<th>"+s[i]+"</th>"
 		}	
 	}
