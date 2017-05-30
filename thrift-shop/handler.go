@@ -70,7 +70,7 @@ func init(){
 			brokerIP = strings.TrimSpace(tmp[1])
 		} else{
 		m[tmp[0]], err = strconv.ParseFloat(tmp[1], 64)
-		supplies[tmp[0]] = &supplyItem{stock: 9, price: math.MaxFloat64, prefProd: "default"}
+		supplies[tmp[0]] = &supplyItem{stock: 25, price: math.MaxFloat64, prefProd: "default"}
 		if(err!=nil){
 				fmt.Println(err)
 			}
@@ -108,7 +108,6 @@ func (p* StoreHandler) Order(product string, amount int32) (err error){
 		modifySupply(product, ((-1)*amount))
 		go evalSupplies(product)
 		s:=sensorIP+":" +strconv.Itoa(int(mp[product]))
-		fmt.Println(s)
 		ServerAddr, err := net.ResolveUDPAddr("udp", s)
 		if(err!=nil){
 			fmt.Println(err)
@@ -124,6 +123,7 @@ func (p* StoreHandler) Order(product string, amount int32) (err error){
 		buf := []byte(strconv.Itoa(int(amount)))
 		Conn.Write(buf)
 		fmt.Println(amount, " " + product + " was ordered")
+		fmt.Println("Remaining stock for " + product + " is " + strconv.FormatInt(int64(supplies[product].stock),10))
 		return  nil
 	}
 	return errors.New("not in stock")

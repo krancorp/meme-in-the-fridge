@@ -45,6 +45,7 @@ func initMQTT(){
 }
 func evalSupplies(product string){
 	if(supplies[product].stock <= 20){
+		
 		token := mqttClient.Publish("requests/" + product, 0, false, "Need;61")
 		token.Wait()
 		fmt.Println("Published request for " + product)
