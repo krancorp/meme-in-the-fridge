@@ -30,14 +30,22 @@ import (
 	"strings"
 	"errors"
 	"net"
+	"sync"
 )
-
+type supplyItem struct{
+	stock int32
+	prefProd string
+	price float64
+	sync.Mutex
+}
 type StoreHandler struct {
 	log map[int]*shared.SharedStruct
 }
+var supplies map[string]*supplyItem
 var m map[string]float64
 var mp map[string]int64
-var ip string
+var sensorIP string
+var brokerIP string
 func init(){
 	//Open File
 	file, err := os.Open("./config")
@@ -47,6 +55,7 @@ func init(){
 	defer file.Close()
 	m = make(map[string]float64)
 	mp = make(map[string]int64)
+	supplies = make(map[string]*supplyItem)
 	//Start Reading..
 	reader := bufio.NewReader(file)
 	for {
@@ -56,9 +65,12 @@ func init(){
 		} 
 		tmp := strings.Split(line, " ")
 		if(tmp[0] == "SENSORIP"){
-			ip = strings.TrimSpace(tmp[1])	
-		} else {
+			sensorIP = strings.TrimSpace(tmp[1])	
+		} else if(tmp[0] == "BROKERIP"){
+			brokerIP = strings.TrimSpace(tmp[1])
+		} else{
 		m[tmp[0]], err = strconv.ParseFloat(tmp[1], 64)
+		supplies[tmp[0]] = &supplyItem{stock: 9, price: math.MaxFloat64, prefProd: "default"}
 		if(err!=nil){
 				fmt.Println(err)
 			}
@@ -68,6 +80,7 @@ func init(){
 			}
 		}
 	}
+	initMQTT()
 }
 
 func NewStoreHandler() *StoreHandler {
@@ -86,9 +99,15 @@ func (p* StoreHandler) GetPrice(product string) (price float64, err error){
 }
 
 func (p* StoreHandler) Order(product string, amount int32) (err error){
-	fmt.Println(amount, " " + product + " was ordered")
 	if _, ok := m[product]; ok{
-		s:=ip+":" +strconv.Itoa(int(mp[product]))
+		if(amount > supplies[product].stock){
+			fmt.Println("Order exceeded stock")
+			go evalSupplies(product)
+			return errors.New("not enough items in stock, try again later")	
+		}
+		modifySupply(product, ((-1)*amount))
+		go evalSupplies(product)
+		s:=sensorIP+":" +strconv.Itoa(int(mp[product]))
 		fmt.Println(s)
 		ServerAddr, err := net.ResolveUDPAddr("udp", s)
 		if(err!=nil){
@@ -104,6 +123,7 @@ func (p* StoreHandler) Order(product string, amount int32) (err error){
 		}
 		buf := []byte(strconv.Itoa(int(amount)))
 		Conn.Write(buf)
+		fmt.Println(amount, " " + product + " was ordered")
 		return  nil
 	}
 	return errors.New("not in stock")

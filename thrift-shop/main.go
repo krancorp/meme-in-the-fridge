@@ -42,7 +42,6 @@ func main() {
 	secure := flag.Bool("secure", false, "Use tls secure transport")
 
 	flag.Parse()
-
 	var protocolFactory thrift.TProtocolFactory
 	switch *protocol {
 	case "compact":
